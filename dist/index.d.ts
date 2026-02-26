@@ -1,2 +1,2 @@
-declare function main(): Promise<void>;
+export {};
 //# sourceMappingURL=index.d.ts.map

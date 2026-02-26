@@ -1,7 +1,23 @@
-console.log('YouTube MCP Server is starting...');
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+
+const server = new Server(
+  {
+    name: 'youtube-mcp',
+    version: '1.0.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
 
 async function main(): Promise<void> {
-  console.log('YouTube MCP Server initialized');
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('YouTube MCP Server running on stdio');
 }
 
 main().catch((error) => {
