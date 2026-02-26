@@ -7,6 +7,78 @@ import { validateYoutubeUrl } from './utils/validators.js';
 
 const execAsync = promisify(exec);
 
+const MAX_VIDEO_DURATION_SECONDS = 7200;
+const DOWNLOAD_TIMEOUT_MS = 300000;
+
+function log(level: 'info' | 'error' | 'warn', message: string, data?: unknown): void {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    level,
+    message,
+    ...(data ? { data } : {}),
+  };
+  console.error(JSON.stringify(logEntry));
+}
+
+function sanitizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.replace(/[\\/:*?"<>|]/g, '');
+  }
+  return String(error);
+}
+
+function createErrorResponse(message: string, originalError?: unknown) {
+  const sanitizedMessage = sanitizeError(message);
+  log('error', sanitizedMessage, originalError ? { error: sanitizeError(originalError) } : undefined);
+  
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: sanitizedMessage,
+      },
+    ],
+    isError: true as const,
+  };
+}
+
+async function execWithTimeout(command: string, timeoutMs: number): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    exec(command, (error, stdout, stderr) => {
+      clearTimeout(timeout);
+      if (error) {
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
+
+async function getVideoDuration(url: string): Promise<number> {
+  try {
+    const command = `yt-dlp --get-duration "${url}"`;
+    const { stdout } = await execWithTimeout(command, 30000);
+    const durationStr = stdout.trim();
+    const parts = durationStr.split(':').map(Number);
+    
+    if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      return parts[0] * 60 + parts[1];
+    } else {
+      return parts[0];
+    }
+  } catch {
+    return 0;
+  }
+}
+
 const server = new Server(
   {
     name: 'youtube-downloader-mcp',
@@ -44,61 +116,207 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['url'],
         },
       },
+      {
+        name: 'download_youtube_video',
+        description: 'Download a YouTube video to the downloads directory',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              description: 'The YouTube video URL to download',
+            },
+            format: {
+              type: 'string',
+              enum: ['mp4', 'webm'],
+              description: 'Video format (default: mp4)',
+            },
+            resolution: {
+              type: 'string',
+              enum: ['best', '720p', '1080p'],
+              description: 'Video resolution (default: best)',
+            },
+          },
+          required: ['url'],
+        },
+      },
+      {
+        name: 'download_youtube_audio',
+        description: 'Download audio from a YouTube video to the downloads directory',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              description: 'The YouTube video URL to extract audio from',
+            },
+            audio_format: {
+              type: 'string',
+              enum: ['mp3', 'm4a', 'opus'],
+              description: 'Audio format (default: mp3)',
+            },
+          },
+          required: ['url'],
+        },
+      },
     ],
   };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === 'check_ytdlp') {
-    try {
-      const { stdout, stderr } = await execAsync('yt-dlp --version');
-      const version = stdout.trim() || stderr.trim();
+  try {
+    if (request.params.name === 'check_ytdlp') {
+      try {
+        const { stdout, stderr } = await execAsync('yt-dlp --version');
+        const version = stdout.trim() || stderr.trim();
+        
+        log('info', 'yt-dlp version check successful', { version });
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `yt-dlp version: ${version}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return createErrorResponse('Failed to check yt-dlp version. Please ensure yt-dlp is installed and available in PATH.', error);
+      }
+    }
+    
+    if (request.params.name === 'validate_youtube_url') {
+      const url = request.params.arguments?.url as string;
+      const isValid = validateYoutubeUrl(url);
+      
+      log('info', 'URL validation', { url, isValid });
       
       return {
         content: [
           {
             type: 'text',
-            text: `yt-dlp version: ${version}`,
+            text: isValid ? 'Valid YouTube URL' : 'Invalid YouTube URL',
           },
         ],
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to check yt-dlp version: ${errorMessage}. Please ensure yt-dlp is installed and available in PATH.`,
-          },
-        ],
-        isError: true,
       };
     }
-  }
   
-  if (request.params.name === 'validate_youtube_url') {
-    const url = request.params.arguments?.url as string;
-    const isValid = validateYoutubeUrl(url);
+  if (request.params.name === 'download_youtube_video') {
+      const args = request.params.arguments;
+      const url = args?.url as string;
+      const format = (args?.format as string) || 'mp4';
+      const resolution = (args?.resolution as string) || 'best';
+      
+      if (!url || !validateYoutubeUrl(url)) {
+        log('warn', 'Invalid YouTube URL provided', { url });
+        return createErrorResponse('Invalid YouTube URL. Please provide a valid YouTube video URL.');
+      }
+      
+      if (url.includes('list=')) {
+        log('warn', 'Playlist URL rejected', { url });
+        return createErrorResponse('Playlist downloads are not supported. Please provide a single video URL.');
+      }
+      
+      const duration = await getVideoDuration(url);
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        const hours = Math.floor(duration / 3600);
+        const minutes = Math.floor((duration % 3600) / 60);
+        log('warn', 'Video duration exceeds limit', { url, duration, hours, minutes });
+        return createErrorResponse(`Video duration (${hours}h ${minutes}m) exceeds maximum allowed duration of 2 hours. Please provide a shorter video.`);
+      }
+      
+      const formatMap: Record<string, string> = {
+        mp4: 'mp4',
+        webm: 'webm',
+      };
+      
+      const resolutionMap: Record<string, string> = {
+        best: 'best',
+        '720p': '720',
+        '1080p': '1080',
+      };
+      
+      const selectedFormat = formatMap[format] || 'mp4';
+      const selectedResolution = resolutionMap[resolution] || 'best';
+      
+      const formatFlag = selectedFormat === 'mp4' ? 'mp4' : 'webm';
+      const resolutionFlag = selectedResolution === 'best' ? 'best' : `res:${selectedResolution}`;
+      
+      try {
+        const command = `yt-dlp -f "bestvideo[ext=${formatFlag}][height<=${selectedResolution === 'best' ? 9999 : selectedResolution}]+bestaudio[ext=m4a]/best[ext=${formatFlag}][height<=${selectedResolution === 'best' ? 9999 : selectedResolution}]/best" -o "./downloads/%(title)s.%(ext)s" "${url}"`;
+        const { stdout, stderr } = await execWithTimeout(command, DOWNLOAD_TIMEOUT_MS);
+        
+        log('info', 'Video download successful', { url, format: selectedFormat, resolution: selectedResolution });
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Video downloaded successfully to ./downloads directory.\n${stdout}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return createErrorResponse('Failed to download video', error);
+      }
+    }
+  
+    if (request.params.name === 'download_youtube_audio') {
+      const args = request.params.arguments;
+      const url = args?.url as string;
+      const audioFormat = (args?.audio_format as string) || 'mp3';
+      
+      if (!url || !validateYoutubeUrl(url)) {
+        log('warn', 'Invalid YouTube URL provided', { url });
+        return createErrorResponse('Invalid YouTube URL. Please provide a valid YouTube video URL.');
+      }
+      
+      if (url.includes('list=')) {
+        log('warn', 'Playlist URL rejected', { url });
+        return createErrorResponse('Playlist downloads are not supported. Please provide a single video URL.');
+      }
+      
+      const duration = await getVideoDuration(url);
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        const hours = Math.floor(duration / 3600);
+        const minutes = Math.floor((duration % 3600) / 60);
+        log('warn', 'Video duration exceeds limit', { url, duration, hours, minutes });
+        return createErrorResponse(`Video duration (${hours}h ${minutes}m) exceeds maximum allowed duration of 2 hours. Please provide a shorter video.`);
+      }
+      
+      const formatMap: Record<string, string> = {
+        mp3: 'mp3',
+        m4a: 'm4a',
+        opus: 'opus',
+      };
+      
+      const selectedFormat = formatMap[audioFormat] || 'mp3';
+      
+      try {
+        const command = `yt-dlp -x --audio-format ${selectedFormat} -o "./downloads/%(title)s.%(ext)s" "${url}"`;
+        const { stdout, stderr } = await execWithTimeout(command, DOWNLOAD_TIMEOUT_MS);
+        
+        log('info', 'Audio download successful', { url, format: selectedFormat });
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Audio downloaded successfully to ./downloads directory in ${selectedFormat} format.\n${stdout}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return createErrorResponse('Failed to download audio', error);
+      }
+    }
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: isValid ? 'Valid YouTube URL' : 'Invalid YouTube URL',
-        },
-      ],
-    };
+    log('warn', 'Unknown tool requested', { toolName: request.params.name });
+    return createErrorResponse(`Unknown tool: ${request.params.name}`);
+  } catch (error) {
+    log('error', 'Unhandled error in tool handler', { error: sanitizeError(error), toolName: request.params.name });
+    return createErrorResponse('An unexpected error occurred while processing your request', error);
   }
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Unknown tool: ${request.params.name}`,
-      },
-    ],
-    isError: true,
-  };
 });
 
 async function main(): Promise<void> {
