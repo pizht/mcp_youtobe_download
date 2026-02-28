@@ -1,0 +1,11 @@
+node_modules/
+downloads/
+*.log
+*.tsbuildinfo
+.env
+.env.local
+src/
+tsconfig.json
+.gitignore
+.git/
+.github/

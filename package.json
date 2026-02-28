@@ -1,16 +1,24 @@
 {
-  "name": "youtube-mcp",
+  "name": "youtube-mcp-server",
   "version": "1.0.0",
-  "description": "MCP Server for YouTube",
+  "description": "MCP Server for YouTube - Download videos and audio from YouTube",
   "main": "dist/index.js",
+  "bin": {
+    "youtube-mcp-server": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
-    "youtube"
+    "youtube",
+    "video-download",
+    "audio-extract",
+    "model-context-protocol",
+    "yt-dlp"
   ],
   "author": "",
   "license": "ISC",
@@ -18,11 +26,21 @@
   "engines": {
     "node": ">=18"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "homepage": ""
 }

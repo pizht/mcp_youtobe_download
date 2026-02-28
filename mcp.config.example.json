@@ -1,13 +1,10 @@
 {
   "mcpServers": {
     "youtube-mcp": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "${workspacePath}/dist/index.js"
-      ],
-      "env": {
-        "NODE_ENV": "production"
-      }
+        "youtube-mcp-server@latest"
+      ]
     }
   }
 }

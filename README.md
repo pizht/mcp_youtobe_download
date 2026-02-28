@@ -23,7 +23,39 @@ A Model Context Protocol (MCP) server for downloading YouTube videos and audio.
 - yt-dlp installed and available in PATH
 - npm
 
-## Installation
+## Quick Start with ModelScope (魔搭)
+
+### One-Click Configuration
+
+1. **Install yt-dlp** (if not already installed):
+   ```bash
+   # Windows
+   choco install yt-dlp
+   
+   # macOS
+   brew install yt-dlp
+   
+   # Linux
+   sudo apt install yt-dlp
+   ```
+
+2. **Copy the following JSON configuration** to your MCP client (e.g., Cherry Studio, Claude Desktop, etc.):
+   ```json
+   {
+     "mcpServers": {
+       "youtube-mcp": {
+         "command": "npx",
+         "args": [
+           "youtube-mcp-server@latest"
+         ]
+       }
+     }
+   }
+   ```
+
+3. **That's it!** The MCP server will be automatically downloaded and started.
+
+### Manual Installation
 
 1. Clone or download this repository
 2. Install dependencies:
@@ -48,11 +80,11 @@ Or directly with Node.js:
 node dist/index.js
 ```
 
-### MCP Configuration
+### Using with uvx (Python users)
 
-See [mcp.config.example.json](./mcp.config.example.json) for MCP client configuration.
-
-Copy the example file to `mcp.config.json` and update `${workspacePath}` with your actual project path.
+```bash
+uvx youtube-mcp-server@latest
+```
 
 ## Available Tools
 
