@@ -1,18 +1,25 @@
 {
-  "name": "youtube-mcp",
+  "name": "youtube-downloader-mcp",
   "version": "1.0.0",
-  "description": "MCP Server for YouTube",
+  "description": "MCP Server for YouTube video and audio downloading",
   "main": "dist/index.js",
+  "bin": {
+    "youtube-downloader-mcp": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "predeploy": "npm run build",
     "start": "node dist/index.js",
     "start:sse": "$env:TRANSPORT_TYPE='sse'; $env:PORT='3000'; node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
-    "youtube"
+    "youtube",
+    "youtube-downloader",
+    "yt-dlp",
+    "model-context-protocol"
   ],
   "author": "",
   "license": "ISC",
@@ -20,6 +27,10 @@
   "engines": {
     "node": ">=18"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
