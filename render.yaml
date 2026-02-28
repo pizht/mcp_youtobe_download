@@ -3,7 +3,7 @@ services:
     name: youtube-mcp-server
     env: node
     plan: free
-    buildCommand: npm install --omit=dev
+    buildCommand: npm install && npm run build
     startCommand: node dist/index.js
     envVars:
       - key: NODE_ENV
