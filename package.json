@@ -1,10 +1,10 @@
 {
-  "name": "youtube-mcp-server",
+  "name": "yt-dlp-mcp",
   "version": "1.0.0",
-  "description": "MCP Server for YouTube - Download videos and audio from YouTube",
+  "description": "MCP Server for YouTube - Download videos and audio using yt-dlp",
   "main": "dist/index.js",
   "bin": {
-    "youtube-mcp-server": "dist/index.js"
+    "yt-dlp-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
