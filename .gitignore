@@ -1,7 +1,9 @@
 node_modules/
-dist/
 downloads/
 *.log
 *.tsbuildinfo
 .env
 .env.local
+dist/*.map
+src/*.ts
+src/**/*.ts
