@@ -2,9 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const index_js_1 = require("@modelcontextprotocol/sdk/server/index.js");
 const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
+const sse_js_1 = require("@modelcontextprotocol/sdk/server/sse.js");
 const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
 const child_process_1 = require("child_process");
 const util_1 = require("util");
+const http_1 = require("http");
 const validators_js_1 = require("./utils/validators.js");
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
 const MAX_VIDEO_DURATION_SECONDS = 7200;
@@ -287,9 +289,53 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
     }
 });
 async function main() {
-    const transport = new stdio_js_1.StdioServerTransport();
-    await server.connect(transport);
-    console.error('YouTube Downloader MCP Server running on stdio');
+    const transportType = process.env.TRANSPORT_TYPE || 'stdio';
+    const port = parseInt(process.env.PORT || '3000', 10);
+    if (transportType === 'sse') {
+        const httpServer = (0, http_1.createServer)(async (req, res) => {
+            const corsHeaders = {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+            };
+            if (req.method === 'OPTIONS') {
+                res.writeHead(200, corsHeaders);
+                res.end();
+                return;
+            }
+            if (req.url === '/sse') {
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    ...corsHeaders,
+                });
+                log('info', 'New SSE connection', { ip: req.socket.remoteAddress });
+                const transport = new sse_js_1.SSEServerTransport('/message', res);
+                await server.connect(transport);
+                res.on('close', () => {
+                    log('info', 'SSE connection closed');
+                });
+            }
+            else if (req.url === '/health') {
+                res.writeHead(200, { 'Content-Type': 'application/json', ...corsHeaders });
+                res.end(JSON.stringify({ status: 'healthy', transport: 'sse' }));
+            }
+            else {
+                res.writeHead(404);
+                res.end('Not Found');
+            }
+        });
+        httpServer.listen(port, () => {
+            log('info', `YouTube Downloader MCP Server running on SSE mode`, { port });
+            console.error(`YouTube Downloader MCP Server running on SSE mode at http://localhost:${port}`);
+        });
+    }
+    else {
+        const transport = new stdio_js_1.StdioServerTransport();
+        await server.connect(transport);
+        console.error('YouTube Downloader MCP Server running on stdio');
+    }
 }
 main().catch((error) => {
     console.error('Failed to start server:', error);

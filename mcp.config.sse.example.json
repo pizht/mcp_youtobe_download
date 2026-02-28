@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "youtube-mcp-sse": {
+      "transport": "sse",
+      "url": "http://localhost:3000/sse",
+      "messageUrl": "http://localhost:3000/message"
+    }
+  }
+}

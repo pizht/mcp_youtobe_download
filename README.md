@@ -12,6 +12,9 @@ A Model Context Protocol (MCP) server for downloading YouTube videos and audio.
 - Extract audio in MP3, M4A, or Opus format
 - Validate YouTube URLs
 - Check yt-dlp installation
+- **Multiple transport modes:**
+  - **Stdio mode** - For local MCP clients
+  - **SSE mode** - For remote HTTP connections
 - Security limits:
   - Maximum video duration: 2 hours
   - Playlist downloads are not supported
@@ -39,6 +42,9 @@ A Model Context Protocol (MCP) server for downloading YouTube videos and audio.
 
 ### Running the Server
 
+#### Stdio Mode (default)
+For local MCP clients:
+
 ```bash
 npm start
 ```
@@ -48,11 +54,49 @@ Or directly with Node.js:
 node dist/index.js
 ```
 
+#### SSE Mode (HTTP/Remote)
+For remote connections via HTTP:
+
+```bash
+npm run start:sse
+```
+
+Or with custom port:
+```bash
+set PORT=8080&& set TRANSPORT_TYPE=sse&& node dist/index.js
+```
+
+The SSE server will be available at:
+- SSE endpoint: `http://localhost:3000/sse`
+- Message endpoint: `http://localhost:3000/message`
+- Health check: `http://localhost:3000/health`
+
 ### MCP Configuration
+
+#### Stdio Mode Configuration
 
 See [mcp.config.example.json](./mcp.config.example.json) for MCP client configuration.
 
 Copy the example file to `mcp.config.json` and update `${workspacePath}` with your actual project path.
+
+#### SSE Mode Configuration
+
+See [mcp.config.sse.example.json](./mcp.config.sse.example.json) for SSE client configuration.
+
+Example configuration:
+```json
+{
+  "mcpServers": {
+    "youtube-mcp-sse": {
+      "transport": "sse",
+      "url": "http://localhost:3000/sse",
+      "messageUrl": "http://localhost:3000/message"
+    }
+  }
+}
+```
+
+For remote access, replace `localhost` with your server's IP address or domain.
 
 ## Available Tools
 
