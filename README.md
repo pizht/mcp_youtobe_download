@@ -11,7 +11,7 @@ A Model Context Protocol (MCP) server for downloading YouTube videos and audio.
 - Download YouTube videos in MP4 or WebM format
 - Extract audio in MP3, M4A, or Opus format
 - Validate YouTube URLs
-- Check yt-dlp installation
+- **Auto-download yt-dlp** - No manual installation required!
 - Security limits:
   - Maximum video duration: 2 hours
   - Playlist downloads are not supported
@@ -20,40 +20,30 @@ A Model Context Protocol (MCP) server for downloading YouTube videos and audio.
 ## Requirements
 
 - Node.js >= 18
-- yt-dlp installed and available in PATH
 - npm
 
-## Quick Start with ModelScope (魔搭)
+> **Note:** yt-dlp is automatically downloaded on first run. No manual installation needed!
+
+## Quick Start
 
 ### One-Click Configuration
 
-1. **Install yt-dlp** (if not already installed):
-   ```bash
-   # Windows
-   choco install yt-dlp
-   
-   # macOS
-   brew install yt-dlp
-   
-   # Linux
-   sudo apt install yt-dlp
-   ```
+**Copy the following JSON configuration** to your MCP client (e.g., Cherry Studio, Claude Desktop, etc.):
+```json
+{
+  "mcpServers": {
+    "yt-dlp-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "yt-dlp-mcp"
+      ]
+    }
+  }
+}
+```
 
-2. **Copy the following JSON configuration** to your MCP client (e.g., Cherry Studio, Claude Desktop, etc.):
-   ```json
-   {
-     "mcpServers": {
-       "youtube-mcp": {
-         "command": "npx",
-         "args": [
-           "youtube-mcp-server@latest"
-         ]
-       }
-     }
-   }
-   ```
-
-3. **That's it!** The MCP server will be automatically downloaded and started.
+**That's it!** On first run, yt-dlp will be automatically downloaded and the MCP server will start.
 
 ### Manual Installation
 
@@ -66,6 +56,19 @@ A Model Context Protocol (MCP) server for downloading YouTube videos and audio.
    ```bash
    npm run build
    ```
+4. Run the server:
+   ```bash
+   npm start
+   ```
+
+## How It Works
+
+When you first run the MCP server:
+
+1. **Auto-detect platform** - Windows, macOS, or Linux
+2. **Download yt-dlp** - Automatically fetches the latest yt-dlp binary from GitHub
+3. **Cache locally** - Saves to `./bin/` directory for future use
+4. **Ready to use** - No additional setup required!
 
 ## Usage
 
@@ -80,18 +83,14 @@ Or directly with Node.js:
 node dist/index.js
 ```
 
-### Using with uvx (Python users)
-
-```bash
-uvx youtube-mcp-server@latest
-```
-
 ## Available Tools
 
 ### check_ytdlp
 Check if yt-dlp is installed and get its version.
 
 **Parameters:** None
+
+**Returns:** yt-dlp version and installation path
 
 ### validate_youtube_url
 Validate if a URL is a valid YouTube URL.
@@ -141,16 +140,32 @@ npm run dev
 ```
 mcp_youtobe_new/
 ├── src/
-│   ├── index.ts          # Main MCP server entry point
+│   ├── index.ts              # Main MCP server entry point
 │   └── utils/
-│       └── validators.ts  # URL validation utilities
-├── dist/                 # Compiled JavaScript output
-├── downloads/             # Downloaded files directory
+│       ├── validators.ts     # URL validation utilities
+│       └── ytdlpManager.ts   # yt-dlp auto-download manager
+├── dist/                     # Compiled JavaScript output
+├── bin/                      # Auto-downloaded yt-dlp binary
+├── downloads/                # Downloaded files directory
 ├── package.json
 ├── tsconfig.json
-├── mcp.config.example.json
 └── README.md
 ```
+
+## Troubleshooting
+
+### yt-dlp download fails
+If the automatic download fails (e.g., due to network issues), you can:
+1. Manually download yt-dlp from [GitHub Releases](https://github.com/yt-dlp/yt-dlp/releases)
+2. Place it in the `bin/` directory:
+   - Windows: `bin/yt-dlp.exe`
+   - macOS: `bin/yt-dlp_macos`
+   - Linux: `bin/yt-dlp`
+
+### Update yt-dlp
+To update yt-dlp to a newer version:
+1. Delete the `bin/` directory
+2. Restart the MCP server - it will download the latest version
 
 ## License
 

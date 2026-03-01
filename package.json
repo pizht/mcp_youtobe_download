@@ -1,6 +1,6 @@
 {
   "name": "yt-dlp-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP Server for YouTube - Download videos and audio using yt-dlp",
   "main": "dist/index.js",
   "bin": {
@@ -32,11 +32,13 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@types/follow-redirects": "^1.14.4",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1"
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "follow-redirects": "^1.15.9"
   },
   "repository": {
     "type": "git",

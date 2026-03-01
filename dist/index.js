@@ -7,7 +7,9 @@ const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
 const child_process_1 = require("child_process");
 const util_1 = require("util");
 const validators_js_1 = require("./utils/validators.js");
+const ytdlpManager_js_1 = require("./utils/ytdlpManager.js");
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
+let ytDlpPath;
 const MAX_VIDEO_DURATION_SECONDS = 7200;
 const DOWNLOAD_TIMEOUT_MS = 300000;
 function log(level, message, data) {
@@ -57,7 +59,7 @@ async function execWithTimeout(command, timeoutMs) {
 }
 async function getVideoDuration(url) {
     try {
-        const command = `yt-dlp --get-duration "${url}"`;
+        const command = `"${ytDlpPath}" --get-duration "${url}"`;
         const { stdout } = await execWithTimeout(command, 30000);
         const durationStr = stdout.trim();
         const parts = durationStr.split(':').map(Number);
@@ -158,14 +160,13 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
     try {
         if (request.params.name === 'check_ytdlp') {
             try {
-                const { stdout, stderr } = await execAsync('yt-dlp --version');
-                const version = stdout.trim() || stderr.trim();
-                log('info', 'yt-dlp version check successful', { version });
+                const version = await (0, ytdlpManager_js_1.getYtDlpVersion)();
+                log('info', 'yt-dlp version check successful', { version, path: ytDlpPath });
                 return {
                     content: [
                         {
                             type: 'text',
-                            text: `yt-dlp version: ${version}`,
+                            text: `yt-dlp version: ${version}\nPath: ${ytDlpPath}`,
                         },
                     ],
                 };
@@ -221,7 +222,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
             const formatFlag = selectedFormat === 'mp4' ? 'mp4' : 'webm';
             const resolutionFlag = selectedResolution === 'best' ? 'best' : `res:${selectedResolution}`;
             try {
-                const command = `yt-dlp -f "bestvideo[ext=${formatFlag}][height<=${selectedResolution === 'best' ? 9999 : selectedResolution}]+bestaudio[ext=m4a]/best[ext=${formatFlag}][height<=${selectedResolution === 'best' ? 9999 : selectedResolution}]/best" -o "./downloads/%(title)s.%(ext)s" "${url}"`;
+                const command = `"${ytDlpPath}" -f "bestvideo[ext=${formatFlag}][height<=${selectedResolution === 'best' ? 9999 : selectedResolution}]+bestaudio[ext=m4a]/best[ext=${formatFlag}][height<=${selectedResolution === 'best' ? 9999 : selectedResolution}]/best" -o "./downloads/%(title)s.%(ext)s" "${url}"`;
                 const { stdout, stderr } = await execWithTimeout(command, DOWNLOAD_TIMEOUT_MS);
                 log('info', 'Video download successful', { url, format: selectedFormat, resolution: selectedResolution });
                 return {
@@ -263,7 +264,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
             };
             const selectedFormat = formatMap[audioFormat] || 'mp3';
             try {
-                const command = `yt-dlp -x --audio-format ${selectedFormat} -o "./downloads/%(title)s.%(ext)s" "${url}"`;
+                const command = `"${ytDlpPath}" -x --audio-format ${selectedFormat} -o "./downloads/%(title)s.%(ext)s" "${url}"`;
                 const { stdout, stderr } = await execWithTimeout(command, DOWNLOAD_TIMEOUT_MS);
                 log('info', 'Audio download successful', { url, format: selectedFormat });
                 return {
@@ -288,6 +289,15 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
     }
 });
 async function main() {
+    console.error('[yt-dlp-mcp] Initializing...');
+    try {
+        ytDlpPath = await (0, ytdlpManager_js_1.ensureYtDlpInstalled)();
+        console.error(`[yt-dlp-mcp] Using yt-dlp at: ${ytDlpPath}`);
+    }
+    catch (error) {
+        console.error('[yt-dlp-mcp] Failed to ensure yt-dlp installation:', error);
+        process.exit(1);
+    }
     const transport = new stdio_js_1.StdioServerTransport();
     await server.connect(transport);
     console.error('YouTube Downloader MCP Server running on stdio');
